@@ -41,6 +41,10 @@ def trim_price(price):
         trimmed_price = trimmed_price[trimmed_price.find('$', 1)::]
     return trimmed_price
 
+def remove_dollar_sign(price):
+    num_price = float(price.replace('$', ''))
+    return num_price
+
 def homegoods_checker():
     urls_to_check = [
         'https://www.homegoods.com/us/store/shop/new-arrivals/_/N-842114098?Nr=AND%28product.siteId%3Ahomegoods%2COR%28product.catalogId%3Atjmaxx%29%29&tn=0#/us/store/products/new-arrivals/_/N-842114098?Nr=AND%28isEarlyAccess%3Afalse%2Cproduct.siteId%3Ahomegoods%2COR%28product.catalogId%3Atjmaxx%29%29&Ns=brand%7C1&tag=srt',
@@ -110,7 +114,9 @@ def homegoods_checker():
                 items_of_interest.append(product_data)
             else:
                 continue
+
         time.sleep(random.uniform(30, 60))
+
     return items_of_interest
 
 def tjmaxx_checker():
@@ -187,11 +193,12 @@ def tjmaxx_checker():
                 items_of_interest.append(product_data)
             else:
                 continue
+
         time.sleep(random.uniform(30, 60))
 
     return items_of_interest
 
-def get_price_comps():
+def get_price_comps(rae_dunn_items):
     items_to_analyze = []
     for i in range(1, 50):
         ebay_url = f'https://www.ebay.com/sch/i.html?_from=R40&_nkw=rae+dunn&_sacat=0&LH_TitleDesc=0&_fsrp=1&_ipg=200&LH_Sold=1&_oac=1&_pgn={str(i)}'
@@ -201,10 +208,82 @@ def get_price_comps():
         for listing in listings:
             listing_title = listing.find('h3', class_='s-item__title').text
             listing_price = listing.find('span', class_='s-item__price').text
+
+            for item in rae_dunn_items:
+                if item.title.lower() in listing_title.lower().replace('"', ''):
+                    print(f'{item.title} | {item.price}')
+                    print(f'{listing_title} | {listing_price}')
+                    print(f'{item.link}')
+                    print('---------------------------------------------------------------')
+                    items_to_analyze.append((item.title, item.price, listing_price, item.link))
+
         time.sleep(random.uniform(30, 60))
+    
+    return items_to_analyze
+
+def item_analysis(price_comps):
+    sendable_items = []
+
+    sales_tax = 0.07
+    listing_fee = 0.35
+    sales_price_adjust = 0.90 # Adjust our sales price to 90% of what the recently sold price is to adjust for demand fluctuations
+    final_value_mult = 0.1255
+    final_value_fee = 0.30
+
+    target_profit_margin = 0.35
+
+    for comp in price_comps:
+        item = comp[0]
+        link = comp[3]
+        buy_price = remove_dollar_sign(comp[1])
+        previously_sold_price = remove_dollar_sign(comp[2])
+
+        sales_price_target = round(previously_sold_price * sales_price_adjust, 2)
+
+        cost_to_list = round(buy_price * (1 + sales_tax) + listing_fee, 2)
+        cost_to_sell =  round(final_value_mult * sales_price_target + final_value_fee, 2)
+        realizable_profit = round(sales_price_target - cost_to_list - cost_to_sell, 2)
+
+        profit_margin =  realizable_profit / sales_price_target
+
+        if profit_margin >= target_profit_margin:
+            print(f'Purchase: ${round(buy_price, 2)} | Reasonable Sell: ${round(sales_price_target, 2)} | Potential Profit: ${round(realizable_profit, 2)} (%{round(profit_margin * 100, 2)})')
+            print(f'Item {item} appears to have adequate margins')
+            print(f'{link}')
+            print('---------------------------------------------------------------')
+        elif profit_margin >= target_profit_margin - 0.15:
+            print(f'Purchase: ${round(buy_price, 2)} | Reasonable Sell: ${round(sales_price_target, 2)} | Potential Profit: ${round(realizable_profit, 2)} (%{round(profit_margin * 100, 2)})')
+            print(f'Item {item} profit margins require risk analysis')
+            print(f'{link}')
+            print('---------------------------------------------------------------')
+        else:
+            print(f'Purchase: ${round(buy_price, 2)} | Reasonable Sell: ${round(sales_price_target, 2)} | Potential Profit: ${round(realizable_profit, 2)} (%{round(profit_margin * 100, 2)})')
+            print(f'Item {item} has inadequate margins to make reasonable profit')
+            print(f'{link}')
+            print('---------------------------------------------------------------')
+
+    return sendable_items
 
 if __name__ == '__main__':
-    rae_dunn_items = []
-    rae_dunn_items.append(homegoods_checker())
-    rae_dunn_items.append(tjmaxx_checker())
-    # get_price_comps()
+    # Testing purposes
+    # rae_dunn_items = []
+    # rae_dunn_items.append(homegoods_checker())
+    # rae_dunn_items.append(tjmaxx_checker())
+    # price_comps = get_price_comps(rae_dunn_items)
+    # item_analysis(price_comps)
+
+    test_case = [
+        ('Cookie Jar', '$10', '$25', 'blahblahblah'),
+        ('Table Runner', '$8', '$16', 'kitchenkitchenkitchen'),
+        ('Dog Bowl', '$12', '$15', 'blahpetblah')
+        ]
+    item_analysis(test_case)
+
+    # while True:
+    #     t = time.localtime()
+    #     current_time = time.strftime('%H:%M:%S', t)
+    #     if current_time == '04:12:49':
+    #         rae_dunn_items = []
+    #         rae_dunn_items.append(homegoods_checker())
+    #         rae_dunn_items.append(tjmaxx_checker())
+    #         price_comps = get_price_comps()
